@@ -2,12 +2,15 @@ const { urlencoded }    = require('express')
 const express           = require('express')
 const mongoose          = require('mongoose')
 const path              = require('path')
+const dotenv            = require('dotenv')
 
 const userRoutes        = require('./routes/user')
 
 const app               = express()
 
-const uri = 'mongodb+srv://test:test@cluster0.gx0xkh7.mongodb.net/?retryWrites=true&w=majority'
+dotenv.config()
+
+const uri = process.env.MONGOOSE_URI
 
 mongoose.connect(uri,
   { useNewUrlParser: true,
