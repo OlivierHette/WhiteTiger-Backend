@@ -99,7 +99,7 @@ exports.modifyUser = (req, res, next) => {
 
   const userObject = req.file ? {
     ...req.body,
-    imageProfile: `${req.protocol}://${req.get('host')}/image/${req.file.filename}`,
+    imageProfile: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`,
   } : { ...req.body }
   User.updateOne ( { _id: userId }, { ...userObject, _id: userId })
   .then(() => res.status(200).json( {message: 'User modify with sucess !' }))
