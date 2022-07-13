@@ -1,27 +1,20 @@
-const bcrypt = require('bcrypt')
-const jwt = require('jsonwebtoken')
-const User = require('../models/User')
-const dotenv = require('dotenv')
+const bcrypt  = require('bcrypt')
+const jwt     = require('jsonwebtoken')
+const User    = require('../models/User')
+const dotenv  = require('dotenv')
+const fs      = require('fs')
 
 dotenv.config()
 
 exports.signup = (req, res, next) => {
-  let regexPass = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[-+!*$@%_])([-+!*$@%_\w]{8,15})$/
-  let regexEmail = /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/
-  // let regexEmail = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/
-  let regexUsername = /^[a-zA-Z0-9]+$/
-  let email = req.body.email
-  let username = req.body.username
-  let password = req.body.password
-  let birth = req.body.birth
-  let isAdmin = req.body.isAdmin
-
-  console.log('email -->', email);
-  console.log('username -->', username);
-  console.log('password -->', password);
-  console.log('birth -->', birth);
-  console.log('isAdmin -->',isAdmin);
-  console.log('test regex -->', regexEmail.test(email));
+  const regexPass     = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[-+!*$@%_])([-+!*$@%_\w]{8,15})$/
+  const regexEmail    = /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/
+  const regexUsername = /^[a-zA-Z0-9]+$/
+  const email         = req.body.email
+  const username      = req.body.username
+  const password      = req.body.password
+  const birth         = req.body.birth
+  const isAdmin       = req.body.isAdmin
 
   if(email === null || username === null || password === null) return res.status(401).json({ error: 'Empty fields' })
 
@@ -51,9 +44,9 @@ exports.signup = (req, res, next) => {
 }
 
 exports.login = (req, res, next) => {
-  let email = req.body.email
-  let username = req.body.username
-  let password = req.body.password
+  const email     = req.body.email
+  const username  = req.body.username
+  const password  = req.body.password
 
   User.findOne({$or: [
     { email: email },
@@ -79,3 +72,53 @@ exports.login = (req, res, next) => {
     })
     .catch(error => res.status(500).json({ error: 'Error server !'}))
 }
+
+exports.getUser = (req, res, next) => {
+  const userId = req.params.id
+
+  User.findById(userId)
+    .then(user => {
+      if(user) {
+        res.status(200).json({
+          id: user._id,
+          email: user.email,
+          username: user.username,
+          birth: user.birth,
+          imageProfile: user.imageProfile,
+          isAdmin: user.isAdmin,
+        })
+      } else {
+        res.status(404).json({ error: 'User not found !' })
+      }
+    })
+    .catch(error => res.status(500).json({ error: new Error('Error canot get User !')}))
+}
+
+exports.modifyUser = (req, res, next) => {
+  const userId = req.params.id
+
+  const userObject = req.file ? {
+    ...req.body,
+    imageProfile: `${req.protocol}://${req.get('host')}/image/${req.file.filename}`,
+  } : { ...req.body }
+  User.updateOne ( { _id: userId }, { ...userObject, _id: userId })
+  .then(() => res.status(200).json( {message: 'User modify with sucess !' }))
+  .catch(error => res.status(400).json({ error: new Error('User not found !')}))
+}
+
+exports.deleteUser = (req, res, next) => {
+  const userId = req.params.id
+
+  User.findOne({ _id: userId })
+    .then(user => {
+      if(!user) return res.status(404).json({ error: new Error('User not found !')})
+
+      const filename = user.imageProfile.split('/images/')[1]
+      fs.unlink(`images/${filename}`, () => {
+        User.deleteOne({ _id: userId })
+          .then(() => res.status(200).json({ message: 'User deleted !'}))
+          .catch(error => res.status(400).json( {error: new Error('Canot delete User !')}))
+      })
+    })
+    .catch(error => res.satus(500).json({ error }))
+  }
